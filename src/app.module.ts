@@ -10,7 +10,7 @@ import { JwtAuthGuard } from './auth/jwt-auth.guard.js';
 import { UsersModule } from './users/users.module.js';
 import { LibraryModule } from './library/library.module.js';
 import { MediaModule } from './media/media.module.js';
-import { PlayerModule } from './player/player.module.js';
+import { ProgressModule } from './progress/progress.module.js';
 import { DownloadsModule } from './downloads/downloads.module.js';
 import { CommonModule } from './common/common.module.js';
 import { InfraModule } from './infra/infra.module.js';
@@ -29,7 +29,7 @@ import { InfraModule } from './infra/infra.module.js';
     UsersModule,
     LibraryModule,
     MediaModule,
-    PlayerModule,
+    ProgressModule,
     DownloadsModule,
     CommonModule,
     InfraModule,

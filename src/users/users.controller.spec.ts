@@ -15,4 +15,10 @@ describe('UsersController', () => {
   it('should be defined', () => {
     expect(controller).toBeDefined();
   });
+
+  it('me devuelve el usuario del token', () => {
+    const result = controller.me({ userId: 'u1', email: 'a@b.c' });
+
+    expect(result).toEqual({ id: 'u1', email: 'a@b.c' });
+  });
 });

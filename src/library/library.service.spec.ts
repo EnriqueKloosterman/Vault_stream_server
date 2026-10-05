@@ -84,6 +84,31 @@ describe('LibraryService', () => {
     expect(c.limit).toHaveBeenCalledWith(10);
   });
 
+  it('getItem devuelve item propio', async () => {
+    const itemId = new Types.ObjectId().toString();
+    libraryItems.findOne.mockReturnValue({
+      exec: vi.fn().mockResolvedValue({ _id: itemId, title: 'Película' }),
+    });
+
+    const result = await service.getItem(userId, itemId);
+
+    expect(result).toEqual({ _id: itemId, title: 'Película' });
+    expect(libraryItems.findOne).toHaveBeenCalledWith({
+      _id: itemId,
+      userId: expect.any(Types.ObjectId),
+    });
+  });
+
+  it('getItem lanza 404 si no existe', async () => {
+    libraryItems.findOne.mockReturnValue({
+      exec: vi.fn().mockResolvedValue(null),
+    });
+
+    await expect(
+      service.getItem(userId, new Types.ObjectId().toString()),
+    ).rejects.toBeInstanceOf(NotFoundException);
+  });
+
   it('seriesDetail agrupa episodios por temporada', async () => {
     const seriesId = new Types.ObjectId().toString();
     const seasonId = new Types.ObjectId();

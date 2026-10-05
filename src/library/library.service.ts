@@ -61,6 +61,19 @@ export class LibraryService {
     };
   }
 
+  async getItem(userId: string, itemId: string): Promise<LibraryItem> {
+    if (!Types.ObjectId.isValid(itemId)) {
+      throw new NotFoundException('Recurso no encontrado');
+    }
+    const item = await this.libraryItems
+      .findOne({ _id: itemId, userId: new Types.ObjectId(userId) })
+      .exec();
+    if (!item) {
+      throw new NotFoundException('Recurso no encontrado');
+    }
+    return item;
+  }
+
   async seriesDetail(
     userId: string,
     seriesId: string,

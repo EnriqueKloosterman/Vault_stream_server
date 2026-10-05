@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Post, Query } from '@nestjs/common';
+import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
 import { CurrentUser } from '../common/decorators/current-user.decorator.js';
 import { LibraryQueryDto, ScanDto } from './dto/library-query.dto.js';
 import { LibraryService } from './library.service.js';
@@ -32,5 +32,10 @@ export class LibraryController {
   @Get('status')
   status(@CurrentUser() user: { userId: string }): ScanStatus {
     return this.scannerService.getStatus(user.userId);
+  }
+
+  @Get(':id')
+  detail(@CurrentUser() user: { userId: string }, @Param('id') id: string) {
+    return this.libraryService.getItem(user.userId, id);
   }
 }

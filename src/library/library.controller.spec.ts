@@ -6,7 +6,7 @@ import { ScannerService } from './scanner.service.js';
 describe('LibraryController', () => {
   let controller: LibraryController;
 
-  const libraryService = { list: vi.fn(), seriesDetail: vi.fn() };
+  const libraryService = { list: vi.fn(), seriesDetail: vi.fn(), getItem: vi.fn() };
   const scannerService = { scan: vi.fn(), getStatus: vi.fn() };
 
   const user = { userId: 'u1', email: 'a@b.c' };
@@ -39,6 +39,15 @@ describe('LibraryController', () => {
       type: undefined,
       q: undefined,
     });
+  });
+
+  it('detail delega en getItem', async () => {
+    libraryService.getItem.mockResolvedValue({ _id: 'i1', title: 'X' });
+
+    const result = await controller.detail(user, 'i1');
+
+    expect(result).toEqual({ _id: 'i1', title: 'X' });
+    expect(libraryService.getItem).toHaveBeenCalledWith('u1', 'i1');
   });
 
   it('scan delega en ScannerService', async () => {

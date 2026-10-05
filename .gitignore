@@ -1,0 +1,27 @@
+# dependencies
+node_modules/
+
+# build
+dist/
+
+# env (nunca versionar secrets)
+.env
+.env.*
+!.env.example
+
+# logs
+*.log
+npm-debug.log*
+
+# test / coverage
+coverage/
+
+# typescript
+*.tsbuildinfo
+
+# editors
+.vscode/
+.idea/
+
+# OS
+.DS_Store

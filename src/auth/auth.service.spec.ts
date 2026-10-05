@@ -2,6 +2,7 @@ import { ConflictException, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { Test, TestingModule } from '@nestjs/testing';
 import { compare, hash } from 'bcryptjs';
+import { ScannerService } from '../library/scanner.service.js';
 import { UsersService } from '../users/users.service.js';
 import { AuthService } from './auth.service.js';
 
@@ -20,6 +21,9 @@ describe('AuthService', () => {
   const jwtService = {
     sign: vi.fn(),
   };
+  const scannerService = {
+    scanAuto: vi.fn(),
+  };
 
   const userDoc = {
     _id: 'u1',
@@ -30,12 +34,14 @@ describe('AuthService', () => {
   beforeEach(async () => {
     vi.clearAllMocks();
     jwtService.sign.mockReturnValue('signed-token');
+    scannerService.scanAuto.mockResolvedValue(undefined);
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         AuthService,
         { provide: UsersService, useValue: usersService },
         { provide: JwtService, useValue: jwtService },
+        { provide: ScannerService, useValue: scannerService },
       ],
     }).compile();
 
@@ -67,6 +73,7 @@ describe('AuthService', () => {
         sub: 'u1',
         email: 'test@example.com',
       });
+      expect(scannerService.scanAuto).toHaveBeenCalledWith('u1');
     });
 
     it('rechaza email ya registrado con 409', async () => {
@@ -105,6 +112,7 @@ describe('AuthService', () => {
         sub: 'u1',
         email: 'test@example.com',
       });
+      expect(scannerService.scanAuto).toHaveBeenCalledWith('u1');
     });
 
     it('rechaza si el usuario no existe', async () => {

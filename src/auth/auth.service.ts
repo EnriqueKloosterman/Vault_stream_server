@@ -5,6 +5,7 @@ import {
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { compare, hash } from 'bcryptjs';
+import { ScannerService } from '../library/scanner.service.js';
 import { UsersService } from '../users/users.service.js';
 import type { LoginDto } from './dto/login.dto.js';
 import type { RegisterDto } from './dto/register.dto.js';
@@ -24,6 +25,7 @@ export class AuthService {
   constructor(
     private readonly usersService: UsersService,
     private readonly jwtService: JwtService,
+    private readonly scannerService: ScannerService,
   ) {}
 
   async register(dto: RegisterDto): Promise<{ access_token: string }> {
@@ -35,6 +37,7 @@ export class AuthService {
     const passwordHash = await hash(dto.password, 10);
     try {
       const user = await this.usersService.create(dto.email, passwordHash);
+      void this.scannerService.scanAuto(String(user._id)).catch(() => undefined);
       return this.sign(String(user._id), user.email);
     } catch (error) {
       if (isDuplicateKeyError(error)) {
@@ -49,6 +52,7 @@ export class AuthService {
     if (!user || !(await compare(dto.password, user.passwordHash))) {
       throw new UnauthorizedException('Credenciales inválidas');
     }
+    void this.scannerService.scanAuto(String(user._id)).catch(() => undefined);
     return this.sign(String(user._id), user.email);
   }
 

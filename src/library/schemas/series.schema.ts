@@ -18,7 +18,13 @@ export class Series {
   posterUrl?: string;
 
   @Prop()
+  backdropUrl?: string;
+
+  @Prop()
   synopsis?: string;
+
+  @Prop()
+  tmdbId?: number;
 
   @Prop()
   r2Prefix?: string;

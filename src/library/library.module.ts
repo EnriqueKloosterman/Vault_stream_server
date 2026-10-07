@@ -3,6 +3,7 @@ import { MongooseModule } from '@nestjs/mongoose';
 import { InfraModule } from '../infra/infra.module.js';
 import { LibraryController } from './library.controller.js';
 import { LibraryService } from './library.service.js';
+import { EnrichmentService } from './enrichment.service.js';
 import { Episode, EpisodeSchema } from './schemas/episode.schema.js';
 import {
   LibraryItem,
@@ -24,7 +25,7 @@ import { SeriesController } from './series.controller.js';
     ]),
   ],
   controllers: [LibraryController, SeriesController],
-  providers: [LibraryService, ScannerService],
+  providers: [LibraryService, ScannerService, EnrichmentService],
   exports: [LibraryService, ScannerService],
 })
 export class LibraryModule {}

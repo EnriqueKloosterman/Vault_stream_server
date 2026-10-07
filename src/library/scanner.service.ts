@@ -3,7 +3,8 @@ import { ConfigService } from '@nestjs/config';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { R2Service, type R2Object } from '../infra/r2/r2.service.js';
-import { classifyVideo, subtitleKeyFor } from './parser.js';
+import { EnrichmentService } from './enrichment.service.js';
+import { classifyVideo, escapeRegex, subtitleKeyFor } from './parser.js';
 import { Episode } from './schemas/episode.schema.js';
 import { LibraryItem } from './schemas/library-item.schema.js';
 import { Season } from './schemas/season.schema.js';
@@ -16,6 +17,11 @@ export interface ScanStatus {
   lastScanAt?: Date;
 }
 
+interface SeenKeys {
+  episodeKeys: Set<string>;
+  itemKeys: Set<string>;
+}
+
 @Injectable()
 export class ScannerService {
   private readonly statuses = new Map<string, ScanStatus>();
@@ -23,6 +29,7 @@ export class ScannerService {
   constructor(
     private readonly r2: R2Service,
     private readonly config: ConfigService,
+    private readonly enrichment: EnrichmentService,
     @InjectModel(LibraryItem.name)
     private readonly libraryItems: Model<LibraryItem>,
     @InjectModel(Series.name) private readonly series: Model<Series>,
@@ -85,19 +92,76 @@ export class ScannerService {
     this.statuses.set(userId, status);
 
     const userIdObj = new Types.ObjectId(userId);
+    const seen: SeenKeys = { episodeKeys: new Set(), itemKeys: new Set() };
     for (const video of videos) {
-      await this.upsertVideo(userIdObj, video, subtitles);
+      await this.upsertVideo(userIdObj, video, subtitles, seen);
       status.processed += 1;
     }
 
+    await this.pruneStale(userIdObj, roots, seen);
+
     status.scanning = false;
     status.lastScanAt = new Date();
+    void this.enrichment.enrichUserLibrary(userId).catch(() => undefined);
+  }
+
+  private async pruneStale(
+    userId: Types.ObjectId,
+    roots: string[],
+    seen: SeenKeys,
+  ): Promise<void> {
+    const rootPattern = roots
+      .map((root) => escapeRegex(root.trim().replace(/\/+$/, '')))
+      .filter((pattern) => pattern.length > 0)
+      .join('|');
+    if (rootPattern.length === 0) {
+      return;
+    }
+    const rootRe = new RegExp(`^(?:${rootPattern})(?:/|$)`);
+
+    await this.libraryItems.deleteMany({
+      userId,
+      r2Key: { $regex: rootRe, $nin: [...seen.itemKeys] },
+    });
+
+    await this.episodes.deleteMany({
+      userId,
+      r2Key: { $regex: rootRe, $nin: [...seen.episodeKeys] },
+    });
+
+    const keptSeasonIds = (await this.episodes
+      .distinct('seasonId', { userId })
+      .exec()) as unknown as Types.ObjectId[];
+    await this.seasons.deleteMany({
+      userId,
+      _id: { $nin: keptSeasonIds },
+    });
+
+    const keptSeriesIds = new Set<Types.ObjectId>(
+      (await this.seasons
+        .distinct('seriesId', { userId })
+        .exec()) as unknown as Types.ObjectId[],
+    );
+    const itemSeriesIds = (await this.libraryItems
+      .distinct('seriesId', { userId, seriesId: { $exists: true } })
+      .exec()) as unknown as Types.ObjectId[];
+    for (const id of itemSeriesIds) {
+      if (id) {
+        keptSeriesIds.add(id);
+      }
+    }
+
+    await this.series.deleteMany({
+      userId,
+      _id: { $nin: [...keptSeriesIds] },
+    });
   }
 
   private async upsertVideo(
     userId: Types.ObjectId,
     video: R2Object,
     subtitleKeys: string[],
+    seen: SeenKeys,
   ): Promise<void> {
     const parsed = classifyVideo(video.key);
     const subtitleKey = subtitleKeyFor(video.key, subtitleKeys);
@@ -150,6 +214,7 @@ export class ScannerService {
         },
         { upsert: true },
       );
+      seen.episodeKeys.add(video.key);
 
       const seriesRowKey =
         parsed.folderPath.length > 0
@@ -174,6 +239,7 @@ export class ScannerService {
         },
         { upsert: true },
       );
+      seen.itemKeys.add(seriesRowKey);
       return;
     }
 
@@ -194,8 +260,9 @@ export class ScannerService {
         $setOnInsert: {
           watched: false,
         },
-      },
-      { upsert: true },
-    );
+},
+        { upsert: true },
+      );
+      seen.itemKeys.add(video.key);
+    }
   }
-}

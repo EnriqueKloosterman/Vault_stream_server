@@ -23,6 +23,12 @@ export class LibraryItem {
   @Prop()
   backdropUrl?: string;
 
+  @Prop()
+  tmdbId?: number;
+
+  @Prop()
+  tmdbSkipped?: boolean;
+
   @Prop({ required: true })
   r2Key: string;
 

@@ -108,6 +108,12 @@ function findEpisodeCode(text: string): EpisodeCode | null {
   return null;
 }
 
+/** Episodios numerados como "001_Título" o "07 Título" (sin SxxExx). */
+function leadingEpisodeNumber(text: string): number | null {
+  const match = /^(\d{1,3})(?=[_\s.\-–—])/.exec(text.trim());
+  return match ? Number(match[1]) : null;
+}
+
 function extractYear(text: string): { year?: number; rest: string } {
   const match = /\b((?:19|20)\d{2})\b/.exec(text);
   if (!match) {
@@ -131,6 +137,7 @@ function stripNoise(text: string): string {
 
 function cleanEpisodeTitle(base: string, seriesTitle: string): string {
   let text = base
+    .replace(/^\s*\d{1,3}(?=[_\s.\-–—])/, ' ')
     .replace(/S\d{1,2}E\d{1,3}/gi, ' ')
     .replace(/(?:^|[^\d])(\d{1,2})x(\d{2,3})(?!\d)/gi, ' ')
     .replace(/(?:^|[\s.([])(\d{1,3})\s*-\s*(\d{1,3})(?![\d-])/g, ' ');
@@ -229,7 +236,10 @@ export function classifyVideo(key: string): ParsedVideo {
         const dash = /(?:^|[\s.([])(\d{1,3})\s*-\s*(\d{1,3})(?![\d-])/.exec(
           base,
         );
-        return dash ? Number(dash[2]) : 0;
+        if (dash) {
+          return Number(dash[2]);
+        }
+        return leadingEpisodeNumber(base) ?? 0;
       })();
 
     const episodeTitle = cleanEpisodeTitle(base, seriesTitle);

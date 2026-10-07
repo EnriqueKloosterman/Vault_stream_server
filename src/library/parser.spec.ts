@@ -70,6 +70,30 @@ describe('parser.classifyVideo', () => {
       expect(result.season).toBe(1);
     }
   });
+
+  it('numero episodios con prefijo NNN_Título dentro de serie', () => {
+    const result = classifyVideo(
+      'series/animacion/he-man/001_Diamond_Ray_of_Disappearance.mp4',
+    );
+    expect(result.kind).toBe('series');
+    if (result.kind === 'series') {
+      expect(result.seriesTitle).toBe('he-man');
+      expect(result.season).toBe(1);
+      expect(result.episode).toBe(1);
+      expect(result.episodeTitle).toBe('Diamond Ray of Disappearance');
+    }
+  });
+
+  it('numero episodios del doble dígito y limpia el título', () => {
+    const result = classifyVideo(
+      'series/animacion/he-man/012_The_Time_Corridor.mp4',
+    );
+    expect(result.kind).toBe('series');
+    if (result.kind === 'series') {
+      expect(result.episode).toBe(12);
+      expect(result.episodeTitle).toBe('The Time Corridor');
+    }
+  });
 });
 
 describe('parser.subtitleKeyFor', () => {

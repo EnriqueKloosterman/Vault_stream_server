@@ -35,6 +35,9 @@ export class Episode {
   @Prop({ min: 0 })
   fileSize?: number;
 
+  @Prop()
+  stillUrl?: string;
+
   @Prop({ required: true, default: false })
   watched: boolean;
 

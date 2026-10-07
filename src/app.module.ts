@@ -7,6 +7,7 @@ import { AppController } from './app.controller.js';
 import { AppService } from './app.service.js';
 import { AuthModule } from './auth/auth.module.js';
 import { JwtAuthGuard } from './auth/jwt-auth.guard.js';
+import { MaintenanceModule } from './maintenance/maintenance.module.js';
 import { UsersModule } from './users/users.module.js';
 import { LibraryModule } from './library/library.module.js';
 import { MediaModule } from './media/media.module.js';
@@ -27,6 +28,7 @@ import { InfraModule } from './infra/infra.module.js';
     }),
     AuthModule,
     UsersModule,
+    MaintenanceModule,
     LibraryModule,
     MediaModule,
     ProgressModule,

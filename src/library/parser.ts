@@ -287,9 +287,26 @@ export function subtitleKeyFor(
   if (sameFolder) {
     return sameFolder;
   }
+  const videoFolder = normalizedVideo.includes('/')
+    ? normalizedVideo.slice(0, normalizedVideo.lastIndexOf('/')).toLowerCase()
+    : '';
   const wantedBase = normalizedVideo.split('/').pop()?.toLowerCase();
   if (!wantedBase) {
     return undefined;
+  }
+  // Preferir subtítulo de la misma carpeta antes que homónimos globales.
+  const sameFolderBase = subtitleKeys.find((key) => {
+    const base = key.split('/').pop()?.replace(/\.srt$/i, '').toLowerCase();
+    if (base !== wantedBase) {
+      return false;
+    }
+    const folder = key.includes('/')
+      ? key.slice(0, key.lastIndexOf('/')).toLowerCase()
+      : '';
+    return folder === videoFolder;
+  });
+  if (sameFolderBase) {
+    return sameFolderBase;
   }
   return subtitleKeys.find(
     (key) => key.split('/').pop()?.replace(/\.srt$/i, '').toLowerCase() === wantedBase,

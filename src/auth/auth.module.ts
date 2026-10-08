@@ -13,13 +13,24 @@ import { JwtStrategy } from './jwt.strategy.js';
     LibraryModule,
     JwtModule.registerAsync({
       inject: [ConfigService],
-      useFactory: (config: ConfigService) => ({
-        secret: config.getOrThrow<string>('JWT_SECRET'),
-        signOptions: {
-          expiresIn:
-            (config.get<string>('JWT_EXPIRES_IN') ?? '30m') as JwtSignOptions['expiresIn'],
-        },
-      }),
+      useFactory: (config: ConfigService) => {
+        const secret = config.getOrThrow<string>('JWT_SECRET');
+        if (secret.length < 32) {
+          throw new Error('JWT_SECRET debe tener al menos 32 caracteres');
+        }
+        const raw = config.get<string>('JWT_EXPIRES_IN') ?? '30m';
+        if (!/^\d+(s|m|h|d)$/.test(raw)) {
+          throw new Error(
+            'JWT_EXPIRES_IN inválido: usa formato como 30m, 1h, 7d',
+          );
+        }
+        return {
+          secret,
+          signOptions: {
+            expiresIn: raw as JwtSignOptions['expiresIn'],
+          },
+        };
+      },
     }),
   ],
   controllers: [AuthController],

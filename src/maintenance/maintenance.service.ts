@@ -1,4 +1,4 @@
-import { Injectable, Logger, OnApplicationBootstrap } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger, OnApplicationBootstrap } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { Download } from '../downloads/schemas/download.schema.js';
@@ -35,6 +35,9 @@ export class MaintenanceService implements OnApplicationBootstrap {
   }
 
   async cascadeDeleteUser(userId: string): Promise<{ deleted: boolean }> {
+    if (!Types.ObjectId.isValid(userId)) {
+      throw new BadRequestException('userId inválido');
+    }
     const userIdObj = new Types.ObjectId(userId);
     const filter = { userId: userIdObj };
 
@@ -55,6 +58,10 @@ export class MaintenanceService implements OnApplicationBootstrap {
     const rawUserIds = (await this.users
       .distinct('_id')
       .exec()) as unknown as Types.ObjectId[];
+    if (rawUserIds.length === 0) {
+      // $nin:[] matchearía TODOS los documentos -> no borrar nada.
+      return 0;
+    }
     const validIds = rawUserIds.map((id) => new Types.ObjectId(id));
     const filter = { userId: { $nin: validIds } };
 

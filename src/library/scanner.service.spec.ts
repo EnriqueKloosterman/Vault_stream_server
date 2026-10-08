@@ -146,7 +146,7 @@ describe('ScannerService', () => {
         r2Key: expect.objectContaining({
           $nin: expect.arrayContaining([
             'Movies/Inception 2010.mp4',
-            'Series/Show/Season 1/',
+            'series/series-1/',
           ]),
         }),
       }),

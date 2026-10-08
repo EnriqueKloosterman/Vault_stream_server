@@ -112,7 +112,24 @@ export function findBestMatch(
   const scored = candidates
     .map((candidate) => ({ candidate, score: scoreCandidate(candidate, options) }))
     .filter((entry) => entry.score > 0)
-    .sort((a, b) => b.score - a.score);
+    .sort((a, b) => {
+      if (b.score !== a.score) {
+        return b.score - a.score;
+      }
+      // Desempate: más votos primero, luego cercanía de fecha al año pedido.
+      if (b.candidate.voteCount !== a.candidate.voteCount) {
+        return b.candidate.voteCount - a.candidate.voteCount;
+      }
+      if (options.year !== undefined) {
+        const wantedYear: number = options.year;
+        const yearDiff = (candidate: TmdbCandidate): number => {
+          const year = candidateYear(candidate);
+          return year === undefined ? Number.MAX_SAFE_INTEGER : Math.abs(year - wantedYear);
+        };
+        return yearDiff(a.candidate) - yearDiff(b.candidate);
+      }
+      return 0;
+    });
 
   const best = scored[0];
   if (!best) {

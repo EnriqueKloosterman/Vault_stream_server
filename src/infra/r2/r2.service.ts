@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import {
   GetObjectCommand,
@@ -14,6 +14,7 @@ export interface R2Object {
 
 @Injectable()
 export class R2Service {
+  private readonly logger = new Logger(R2Service.name);
   private readonly client: S3Client;
   private readonly bucket: string;
   readonly prefixes: string[];
@@ -23,10 +24,13 @@ export class R2Service {
     this.bucket = config.getOrThrow<string>('R2_BUCKET_NAME');
     this.prefixes = (config.get<string>('R2_PREFIXES') ?? '')
       .split(',')
-      .map((p) => p.trim())
+      .map((p) => p.trim().replace(/^\/+/, '').replace(/\/+$/, ''))
       .filter((p) => p.length > 0);
+    const rawTtl = Number(config.get<string>('PRESIGN_TTL_SECONDS') ?? '600');
     this.presignTtl =
-      Number(config.get<string>('PRESIGN_TTL_SECONDS') ?? '600') || 600;
+      Number.isFinite(rawTtl) && rawTtl >= 60 && rawTtl <= 604800
+        ? Math.floor(rawTtl)
+        : 600;
     this.client = new S3Client({
       region: config.get<string>('R2_REGION') ?? 'auto',
       endpoint: config.getOrThrow<string>('R2_ENDPOINT'),
@@ -38,21 +42,35 @@ export class R2Service {
   }
 
   async listAll(prefix: string): Promise<R2Object[]> {
-    const normalized = prefix.endsWith('/') ? prefix : `${prefix}/`;
+    const clean = prefix.replace(/^\/+/, '').replace(/\/+$/, '');
+    const normalized = clean.length > 0 ? `${clean}/` : '';
     const objects: R2Object[] = [];
     let continuationToken: string | undefined;
+    const MAX_OBJECTS = 50000;
 
     do {
-      const response = await this.client.send(
-        new ListObjectsV2Command({
-          Bucket: this.bucket,
-          Prefix: normalized,
-          ContinuationToken: continuationToken,
-        }),
-      );
+      let response;
+      try {
+        response = await this.client.send(
+          new ListObjectsV2Command({
+            Bucket: this.bucket,
+            Prefix: normalized,
+            ContinuationToken: continuationToken,
+          }),
+        );
+      } catch {
+        this.logger.error(`listAll falló para prefijo "${clean}"`);
+        throw new Error('No se pudo listar el almacenamiento');
+      }
       for (const object of response.Contents ?? []) {
         if (object.Key) {
           objects.push({ key: object.Key, size: object.Size ?? 0 });
+        }
+        if (objects.length >= MAX_OBJECTS) {
+          this.logger.warn(
+            `listAll truncado en ${MAX_OBJECTS} objetos para prefijo "${clean}"`,
+          );
+          return objects;
         }
       }
       continuationToken = response.IsTruncated

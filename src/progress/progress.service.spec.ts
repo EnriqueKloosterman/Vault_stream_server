@@ -10,8 +10,10 @@ describe('ProgressService', () => {
   const findResult = {
     exec: vi.fn(),
     sort: vi.fn(),
+    limit: vi.fn(),
   };
   findResult.sort.mockReturnValue(findResult);
+  findResult.limit.mockReturnValue(findResult);
 
   const model = {
     find: vi.fn(),

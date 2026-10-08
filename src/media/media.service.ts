@@ -1,5 +1,4 @@
 import {
-  ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
@@ -21,10 +20,7 @@ export class MediaService {
     if (owned) {
       return this.r2.presignGet(r2Key);
     }
-    const exists = await this.libraryService.keyExists(r2Key);
-    if (exists) {
-      throw new ForbiddenException('No tienes acceso a este recurso');
-    }
+    // 404 siempre para no-propietarios: no revelar si la clave existe.
     throw new NotFoundException('Recurso no encontrado');
   }
 

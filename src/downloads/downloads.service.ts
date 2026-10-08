@@ -23,12 +23,19 @@ export class DownloadsService implements OnModuleInit {
 
   async onModuleInit(): Promise<void> {
     await this.purgeExpired();
+    // Sin cron externo los expirados se acumularían hasta el reinicio:
+    // purga periódica cada hora.
+    const timer = setInterval(() => {
+      void this.purgeExpired().catch(() => undefined);
+    }, 60 * 60 * 1000);
+    timer.unref?.();
   }
 
   async list(userId: string): Promise<Download[]> {
     return this.downloadsModel
       .find({ userId: new Types.ObjectId(userId) })
       .sort({ updatedAt: -1 })
+      .limit(500)
       .exec();
   }
 
@@ -51,6 +58,26 @@ export class DownloadsService implements OnModuleInit {
     const refIdObj = new Types.ObjectId(dto.refId);
     const expiresAt = new Date(Date.now() + SEVEN_DAYS_MS);
 
+    const resetExisting = async (): Promise<DownloadDocument | null> => {
+      const found = await this.downloadsModel
+        .findOne({ userId: userIdObj, itemType: dto.itemType, refId: refIdObj })
+        .exec();
+      if (!found) {
+        return null;
+      }
+      found.set({
+        localPath: `downloads/${String(found._id)}.mp4`,
+        r2Key: video.r2Key,
+        fileSize: video.fileSize,
+        status: 'pending',
+        progressPct: 0,
+        expiresAt,
+      });
+      await found.updateOne({ $unset: { error: 1 } }).exec();
+      found.error = undefined;
+      return found.save();
+    };
+
     const existing = await this.downloadsModel
       .findOne({ userId: userIdObj, itemType: dto.itemType, refId: refIdObj })
       .exec();
@@ -63,26 +90,50 @@ export class DownloadsService implements OnModuleInit {
         fileSize: video.fileSize,
         status: 'pending',
         progressPct: 0,
-        error: undefined,
         expiresAt,
       });
+      await existing.updateOne({ $unset: { error: 1 } }).exec();
+      existing.error = undefined;
       doc = await existing.save();
     } else {
       const downloadId = new Types.ObjectId();
-      doc = await this.downloadsModel.create({
-        _id: downloadId,
-        userId: userIdObj,
-        itemType: dto.itemType,
-        refId: refIdObj,
-        localPath: `downloads/${String(downloadId)}.mp4`,
-        r2Key: video.r2Key,
-        fileSize: video.fileSize,
-        status: 'pending',
-        progressPct: 0,
-        expiresAt,
-      });
+      try {
+        doc = await this.downloadsModel.create({
+          _id: downloadId,
+          userId: userIdObj,
+          itemType: dto.itemType,
+          refId: refIdObj,
+          localPath: `downloads/${String(downloadId)}.mp4`,
+          r2Key: video.r2Key,
+          fileSize: video.fileSize,
+          status: 'pending',
+          progressPct: 0,
+          expiresAt,
+        });
+      } catch (error) {
+        if (
+          typeof error === 'object' &&
+          error !== null &&
+          'code' in error &&
+          ((error as { code?: unknown }).code === 11000 ||
+            (error as { code?: unknown }).code === 11001)
+        ) {
+          // Carrera: otro request creó el registro primero -> reutilizarlo.
+          const winner = await resetExisting();
+          if (!winner) {
+            throw error;
+          }
+          doc = winner;
+        } else {
+          throw error;
+        }
+      }
     }
 
+    // Nota: `url` es un presigned GET con TTL corto (PRESIGN_TTL_SECONDS,
+    // por defecto 10 min) mientras `expiresAt` marca la vigencia del
+    // registro (7 días). Si la URL caduca, el cliente debe llamar de nuevo
+    // a `start` para obtener una URL fresca.
     const { url, expiresIn } = await this.r2.presignGet(video.r2Key);
     return {
       downloadId: String(doc._id),
@@ -99,10 +150,14 @@ export class DownloadsService implements OnModuleInit {
     progressPct: number,
   ): Promise<Download> {
     const doc = await this.owned(userId, downloadId);
-    doc.progressPct = progressPct;
-    if (doc.status !== 'completed') {
-      doc.status = 'downloading';
+    if (doc.status === 'completed') {
+      return doc;
     }
+    // Monotónico: no retroceder el progreso.
+    if (progressPct > doc.progressPct) {
+      doc.progressPct = progressPct;
+    }
+    doc.status = 'downloading';
     return doc.save();
   }
 

@@ -117,17 +117,21 @@ describe('LibraryService', () => {
     });
     seasons.find.mockReturnValue({
       sort: vi.fn().mockReturnValue({
-        exec: vi.fn().mockResolvedValue([{ _id: seasonId, number: 1 }]),
+        limit: vi.fn().mockReturnValue({
+          exec: vi.fn().mockResolvedValue([{ _id: seasonId, number: 1 }]),
+        }),
       }),
     });
     episodes.find.mockReturnValue({
       sort: vi.fn().mockReturnValue({
-        exec: vi
-          .fn()
-          .mockResolvedValue([
-            { _id: 'e1', seasonId, number: 1 },
-            { _id: 'e2', seasonId, number: 2 },
-          ]),
+        limit: vi.fn().mockReturnValue({
+          exec: vi
+            .fn()
+            .mockResolvedValue([
+              { _id: 'e1', seasonId, number: 1 },
+              { _id: 'e2', seasonId, number: 2 },
+            ]),
+        }),
       }),
     });
 

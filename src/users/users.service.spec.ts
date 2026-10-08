@@ -57,12 +57,20 @@ describe('UsersService', () => {
   });
 
   it('findById delega en el modelo', async () => {
-    const exec = vi.fn().mockResolvedValue({ _id: 'u1' });
+    const id = '507f1f77bcf86cd799439011';
+    const exec = vi.fn().mockResolvedValue({ _id: id });
     userModel.findById.mockReturnValue({ exec });
 
+    const result = await service.findById(id);
+
+    expect(result).toEqual({ _id: id });
+    expect(userModel.findById).toHaveBeenCalledWith(id);
+  });
+
+  it('findById devuelve null sin consultar con id inválido', async () => {
     const result = await service.findById('u1');
 
-    expect(result).toEqual({ _id: 'u1' });
-    expect(userModel.findById).toHaveBeenCalledWith('u1');
+    expect(result).toBeNull();
+    expect(userModel.findById).not.toHaveBeenCalled();
   });
 });

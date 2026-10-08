@@ -11,6 +11,9 @@ export class Series {
   @Prop({ required: true, trim: true, index: true })
   title: string;
 
+  @Prop({ required: true, trim: true, lowercase: true, index: true })
+  normalizedTitle: string;
+
   @Prop({ min: 1900, max: 2100 })
   year?: number;
 
@@ -32,3 +35,4 @@ export class Series {
 
 export const SeriesSchema = SchemaFactory.createForClass(Series);
 SeriesSchema.index({ userId: 1, title: 1 });
+SeriesSchema.index({ userId: 1, normalizedTitle: 1 }, { unique: true });

@@ -23,7 +23,7 @@ import { InfraModule } from './infra/infra.module.js';
     MongooseModule.forRootAsync({
       inject: [ConfigService],
       useFactory: (config: ConfigService) => ({
-        uri: config.get<string>('MONGODB_URI'),
+        uri: config.getOrThrow<string>('MONGODB_URI'),
       }),
     }),
     AuthModule,
@@ -39,8 +39,8 @@ import { InfraModule } from './infra/infra.module.js';
   controllers: [AppController],
   providers: [
     AppService,
-    { provide: APP_GUARD, useClass: JwtAuthGuard },
     { provide: APP_GUARD, useClass: ThrottlerGuard },
+    { provide: APP_GUARD, useClass: JwtAuthGuard },
   ],
 })
 export class AppModule {}

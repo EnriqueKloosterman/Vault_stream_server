@@ -14,6 +14,15 @@ export interface LibraryListParams {
   q?: string;
 }
 
+function sanitizeFileName(title: string, fallback: string): string {
+  const clean = title
+    .replace(/[/\\<>:"|?*\x00-\x1F]/g, ' ')
+    .replace(/\s{2,}/g, ' ')
+    .trim()
+    .slice(0, 150);
+  return clean.length > 0 ? clean : fallback;
+}
+
 @Injectable()
 export class LibraryService {
   constructor(
@@ -43,12 +52,17 @@ export class LibraryService {
       filter.title = { $regex: escapeRegex(params.q), $options: 'i' };
     }
 
+    // Defensa en profundidad: el servicio también clampéa por si se usa
+    // fuera del controller (el DTO ya valida Min/Max).
+    const page = Math.max(1, Math.floor(params.page) || 1);
+    const limit = Math.min(100, Math.max(1, Math.floor(params.limit) || 20));
+
     const [items, total] = await Promise.all([
       this.libraryItems
         .find(filter)
         .sort({ title: 1 })
-        .skip((params.page - 1) * params.limit)
-        .limit(params.limit)
+        .skip((page - 1) * limit)
+        .limit(limit)
         .exec(),
       this.libraryItems.countDocuments(filter),
     ]);
@@ -56,8 +70,8 @@ export class LibraryService {
     return {
       items,
       total,
-      page: params.page,
-      limit: params.limit,
+      page,
+      limit,
     };
   }
 
@@ -96,10 +110,12 @@ export class LibraryService {
       this.seasons
         .find({ userId: userIdObj, seriesId: seriesDoc._id })
         .sort({ number: 1 })
+        .limit(200)
         .exec(),
       this.episodes
         .find({ userId: userIdObj, seriesId: seriesDoc._id })
         .sort({ number: 1 })
+        .limit(2000)
         .exec(),
     ]);
 
@@ -159,7 +175,7 @@ export class LibraryService {
       }
       return {
         r2Key: item.r2Key,
-        fileName: `${item.title}.mp4`,
+        fileName: `${sanitizeFileName(item.title, 'video')}.mp4`,
         fileSize: item.fileSize,
       };
     }
@@ -172,7 +188,7 @@ export class LibraryService {
     }
     return {
       r2Key: episode.r2Key,
-      fileName: `${episode.title}.mp4`,
+      fileName: `${sanitizeFileName(episode.title, 'video')}.mp4`,
       fileSize: episode.fileSize,
     };
   }

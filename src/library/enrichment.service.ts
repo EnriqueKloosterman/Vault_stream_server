@@ -78,15 +78,27 @@ export class EnrichmentService {
       consecutiveFailures = 0;
 
       if (!match) {
-        await this.libraryItems.updateOne(
-          { _id: item._id },
-          { $set: { tmdbSkipped: true } },
-        );
+        try {
+          await this.libraryItems.updateOne(
+            { _id: item._id },
+            { $set: { tmdbSkipped: true } },
+          );
+        } catch (error) {
+          this.logger.warn(
+            `No se pudo marcar tmdbSkipped para ${String(item._id)}: ${String(error)}`,
+          );
+        }
         continue;
       }
 
-      await this.persistMatch(userObj, item, match);
-      matched += 1;
+      try {
+        await this.persistMatch(userObj, item, match);
+        matched += 1;
+      } catch (error) {
+        this.logger.warn(
+          `persistMatch falló para "${item.title}": ${String(error)}`,
+        );
+      }
     }
 
     return { processed: items.length, matched };
@@ -99,8 +111,9 @@ export class EnrichmentService {
   ): Promise<void> {
     const posterUrl = this.tmdb.posterUrl(match.candidate.posterPath);
     const backdropUrl = this.tmdb.backdropUrl(match.candidate.backdropPath);
+    const synopsis = match.candidate.overview?.slice(0, SYNOPSIS_MAX_LENGTH);
 
-    if (!posterUrl) {
+    if (!posterUrl && !backdropUrl && !synopsis) {
       await this.libraryItems.updateOne(
         { _id: item._id },
         { $set: { tmdbSkipped: true, tmdbId: match.candidate.id } },
@@ -108,33 +121,45 @@ export class EnrichmentService {
       return;
     }
 
+    const setFields: Record<string, unknown> = {
+      tmdbId: match.candidate.id,
+    };
+    if (posterUrl) {
+      setFields.posterUrl = posterUrl;
+    }
+    if (backdropUrl) {
+      setFields.backdropUrl = backdropUrl;
+    }
     await this.libraryItems.updateOne(
       { _id: item._id },
       {
-        $set: { posterUrl, backdropUrl, tmdbId: match.candidate.id },
+        $set: setFields,
         $unset: { tmdbSkipped: 1 },
       },
     );
 
-    if (item.type === 'series') {
-      await this.series.updateOne(
-        { userId: userObj, title: item.title },
-        {
-          $set: {
-            posterUrl,
-            backdropUrl,
-            tmdbId: match.candidate.id,
-            synopsis: match.candidate.overview?.slice(0, SYNOPSIS_MAX_LENGTH),
-          },
-        },
-      );
-      if (item.seriesId) {
-        await this.enrichEpisodeStills(
-          userObj,
-          item.seriesId,
-          match.candidate.id,
-        );
+    if (item.type === 'series' && item.seriesId) {
+      const seriesSet: Record<string, unknown> = {
+        tmdbId: match.candidate.id,
+      };
+      if (posterUrl) {
+        seriesSet.posterUrl = posterUrl;
       }
+      if (backdropUrl) {
+        seriesSet.backdropUrl = backdropUrl;
+      }
+      if (synopsis) {
+        seriesSet.synopsis = synopsis;
+      }
+      await this.series.updateOne(
+        { _id: item.seriesId, userId: userObj },
+        { $set: seriesSet },
+      );
+      await this.enrichEpisodeStills(
+        userObj,
+        item.seriesId,
+        match.candidate.id,
+      );
     }
   }
 
@@ -148,21 +173,43 @@ export class EnrichmentService {
         .find({ userId: userObj, seriesId })
         .exec();
       for (const season of seasons) {
-        const detail = await this.tmdb.season(tmdbSeriesId, season.number);
+        let detail;
+        try {
+          detail = await this.tmdb.season(tmdbSeriesId, season.number);
+        } catch (error) {
+          // Una temporada inexistente (p. ej. Specials/0) no debe
+          // impedir el resto.
+          this.logger.debug(
+            `TMDB season ${tmdbSeriesId}/${season.number} falló: ${String(error)}`,
+          );
+          continue;
+        }
+        const operations = [];
         for (const episode of detail.episodes) {
           const stillUrl = this.tmdb.stillUrl(episode.stillPath);
           if (!stillUrl) {
             continue;
           }
-          await this.episodes.updateOne(
-            {
-              userId: userObj,
-              seriesId,
-              seasonId: season._id,
-              number: episode.episodeNumber,
+          operations.push({
+            updateOne: {
+              filter: {
+                userId: userObj,
+                seriesId,
+                seasonId: season._id,
+                number: episode.episodeNumber,
+              },
+              update: { $set: { stillUrl } },
             },
-            { $set: { stillUrl } },
-          );
+          });
+        }
+        if (operations.length > 0) {
+          try {
+            await this.episodes.bulkWrite(operations);
+          } catch (error) {
+            this.logger.debug(
+              `bulkWrite de stills falló para ${String(seriesId)}: ${String(error)}`,
+            );
+          }
         }
       }
     } catch (error) {

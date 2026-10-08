@@ -1,5 +1,6 @@
 import { Type } from 'class-transformer';
 import {
+  ArrayMaxSize,
   IsArray,
   IsIn,
   IsInt,
@@ -37,6 +38,8 @@ export class LibraryQueryDto {
 export class ScanDto {
   @IsOptional()
   @IsArray()
+  @ArrayMaxSize(10)
   @IsString({ each: true })
+  @MaxLength(200, { each: true })
   prefixes?: string[];
 }

@@ -1,3 +1,4 @@
+import { Type } from 'class-transformer';
 import {
   IsIn,
   IsMongoId,
@@ -16,6 +17,7 @@ export class StartDownloadDto {
 }
 
 export class DownloadProgressDto {
+  @Type(() => Number)
   @IsNumber()
   @Min(0)
   @Max(100)
@@ -24,6 +26,7 @@ export class DownloadProgressDto {
 
 export class DownloadCompleteDto {
   @IsOptional()
+  @Type(() => Number)
   @IsNumber()
   @Min(0)
   fileSize?: number;

@@ -1,4 +1,8 @@
-import { createParamDecorator, ExecutionContext } from '@nestjs/common';
+import {
+  createParamDecorator,
+  ExecutionContext,
+  UnauthorizedException,
+} from '@nestjs/common';
 
 export interface AuthUser {
   userId: string;
@@ -6,6 +10,11 @@ export interface AuthUser {
 }
 
 export const CurrentUser = createParamDecorator(
-  (_data: unknown, ctx: ExecutionContext): AuthUser =>
-    ctx.switchToHttp().getRequest<{ user: AuthUser }>().user,
+  (_data: unknown, ctx: ExecutionContext): AuthUser => {
+    const user = ctx.switchToHttp().getRequest<{ user?: AuthUser }>().user;
+    if (!user?.userId) {
+      throw new UnauthorizedException('No autenticado');
+    }
+    return user;
+  },
 );

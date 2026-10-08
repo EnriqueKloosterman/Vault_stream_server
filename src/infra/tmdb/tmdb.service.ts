@@ -57,7 +57,7 @@ export class TmdbService {
     const yearParam =
       options.type === 'movie' ? 'year' : 'first_air_date_year';
 
-    const grouped = await Promise.all(
+    const settled = await Promise.allSettled(
       SEARCH_LANGUAGES.map(async (language) => {
         const params = new URLSearchParams({
           api_key: this.apiKey,
@@ -73,6 +73,12 @@ export class TmdbService {
         return (body.results ?? []).map((record) => toCandidate(record));
       }),
     );
+    const grouped = settled.flatMap((entry) =>
+      entry.status === 'fulfilled' ? [entry.value] : [],
+    );
+    if (grouped.length === 0) {
+      throw new TmdbApiError('TMDB no respondió en ningún idioma');
+    }
 
     const merged = new Map<number, TmdbCandidate>();
     for (const candidates of grouped) {
@@ -158,7 +164,11 @@ export class TmdbService {
     if (!response.ok) {
       throw new TmdbApiError(`TMDB responded ${response.status}`);
     }
-    return (await response.json()) as T;
+    try {
+      return (await response.json()) as T;
+    } catch {
+      throw new TmdbApiError('TMDB devolvió una respuesta no-JSON');
+    }
   }
 }
 

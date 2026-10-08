@@ -9,8 +9,9 @@ import { Download } from './schemas/download.schema.js';
 describe('DownloadsService', () => {
   let service: DownloadsService;
 
-  const findResult = { exec: vi.fn(), sort: vi.fn() };
+  const findResult = { exec: vi.fn(), sort: vi.fn(), limit: vi.fn() };
   findResult.sort.mockReturnValue(findResult);
+  findResult.limit.mockReturnValue(findResult);
 
   const model = {
     find: vi.fn(),
@@ -95,6 +96,9 @@ describe('DownloadsService', () => {
     };
     existing.set = vi.fn((fields: Record<string, unknown>) => {
       Object.assign(existing, fields);
+    });
+    existing.updateOne = vi.fn().mockReturnValue({
+      exec: vi.fn().mockResolvedValue({}),
     });
     existing.save = vi.fn().mockResolvedValue(existing);
     findResult.exec.mockResolvedValue(existing);

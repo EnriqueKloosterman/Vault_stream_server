@@ -27,7 +27,7 @@ describe('EnrichmentService', () => {
   const libraryItems = { find: vi.fn(), updateOne: vi.fn() };
   const series = { updateOne: vi.fn() };
   const seasons = { find: vi.fn() };
-  const episodes = { updateOne: vi.fn() };
+  const episodes = { updateOne: vi.fn(), bulkWrite: vi.fn() };
 
   const userId = '507f1f77bcf86cd799439011';
 
@@ -111,7 +111,13 @@ describe('EnrichmentService', () => {
 
   it('para series además sincroniza el doc Series con synopsis', async () => {
     chainFind([
-      { _id: 's1', type: 'series', title: 'Breaking Bad', year: 2008 },
+      {
+        _id: 's1',
+        type: 'series',
+        title: 'Breaking Bad',
+        year: 2008,
+        seriesId: 'ser-9',
+      },
     ]);
     tmdb.search.mockResolvedValue([
       movieCandidate({
@@ -142,7 +148,7 @@ describe('EnrichmentService', () => {
       },
     );
     expect(series.updateOne).toHaveBeenCalledWith(
-      { userId: expect.anything(), title: 'Breaking Bad' },
+      { _id: 'ser-9', userId: expect.anything() },
       {
         $set: {
           posterUrl: 'https://image.tmdb.org/t/p/w500/poster.jpg',
@@ -181,16 +187,21 @@ describe('EnrichmentService', () => {
 
     await service.enrichUserLibrary(userId);
 
-    expect(episodes.updateOne).toHaveBeenCalledWith(
-      {
-        userId: expect.anything(),
-        seriesId: 'ser-1',
-        seasonId: 'season-1',
-        number: 1,
+    expect(episodes.bulkWrite).toHaveBeenCalledTimes(1);
+    const operations = episodes.bulkWrite.mock.calls[0][0];
+    expect(operations).toHaveLength(1);
+    expect(operations[0]).toEqual({
+      updateOne: {
+        filter: {
+          userId: expect.anything(),
+          seriesId: 'ser-1',
+          seasonId: 'season-1',
+          number: 1,
+        },
+        update: { $set: { stillUrl: 'https://image.tmdb.org/t/p/w300/still1.jpg' } },
       },
-      { $set: { stillUrl: 'https://image.tmdb.org/t/p/w300/still1.jpg' } },
-    );
-    expect(episodes.updateOne).toHaveBeenCalledTimes(1);
+    });
+    expect(episodes.updateOne).not.toHaveBeenCalled();
   });
 
   it('marca como skip si no hay coincidencia y no persiste URLs', async () => {

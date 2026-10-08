@@ -1,4 +1,4 @@
-import { ForbiddenException, NotFoundException } from '@nestjs/common';
+import { NotFoundException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { R2Service } from '../infra/r2/r2.service.js';
 import { LibraryService } from '../library/library.service.js';
@@ -44,12 +44,12 @@ describe('MediaService', () => {
     expect(r2.presignGet).toHaveBeenCalledWith('Movies/a.mp4');
   });
 
-  it('presign lanza 403 si existe pero no es del usuario', async () => {
+  it('presign lanza 404 si no es del usuario (sin oráculo 403)', async () => {
     library.findOwnedKey.mockResolvedValue(false);
     library.keyExists.mockResolvedValue(true);
 
     await expect(service.presign(userId, 'Movies/a.mp4')).rejects.toBeInstanceOf(
-      ForbiddenException,
+      NotFoundException,
     );
     expect(r2.presignGet).not.toHaveBeenCalled();
   });
